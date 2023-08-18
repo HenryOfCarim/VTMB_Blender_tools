@@ -3,7 +3,8 @@ try:
 except: ImportError
 
 import os
-
+# script based on Arben OMARI and DDLullu code
+# probably works only with Vamped 0.92 and  PackFile Explorer 3.09
 
 def write_mesh_materials(nr_fc_mat, mesh):
     for face in mesh.faces:
@@ -162,7 +163,7 @@ class xImport:
                 v_uv = v_uv.split()
                 #print(v_uv)
                 x = float(v_uv[0])
-                y = float(v_uv[1])
+                y = ((float(v_uv[1]))* -1) + 1
                 uv_tuple = (x, y)
                 uv.append(uv_tuple)
                 
