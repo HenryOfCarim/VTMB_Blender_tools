@@ -1,5 +1,5 @@
 # VTMB_Blender_tools
-I was interested in Vampire: The Masquerade – Bloodlines character modding and the first thing I noticed how old they are
+I was interested in Vampire: The Masquerade – Bloodlines character modding tools and the first thing I noticed was how old they are
 I simply can't work with 2.4 Blender so this project is intended to update them to modern 2.80+ API
 
 As I understood, because of the unknown strip algorithm adding new skinned meshes is impossible
