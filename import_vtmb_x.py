@@ -6,15 +6,7 @@ import os
 # script based on Arben OMARI and DDLullu code
 # probably works only with Vamped 0.92 and  PackFile Explorer 3.09
 
-def write_mesh_materials(nr_fc_mat, mesh):
-    for face in mesh.faces:
-        nr_fc_mat += 1
-        line = lines[nr_fc_mat]
-        fixed_line = clean_line(line)
-        wrd = fixed_line.split()
-        mat_idx = int(wrd[0])
-        face.materialIndex = mat_idx
-        
+
 class xImport:
     def __init__(self, file_path):
         self.file_path = file_path
@@ -36,28 +28,40 @@ class xImport:
                 uv_line_idx = lines.index(line_uv)+1 #ve
                 print("found UV")
         # Get materials
-        idx = 0
-        i = -1
+        mat_id = 0
+        line_idx = -1
         materials = []
         textures = []
         for mat_line in lines:
-            i += 1
+            line_idx += 1
             l = mat_line.strip()
             words = mat_line.split()																																																	
             if l and words[0] == "Material" :
-                idx += 1	
-                self.write_materials(i, idx, materials, textures)
+                mat_id += 1	
+                self.write_materials(line_idx, mat_id, materials, textures)
                 print("found material")	
                 		
-        #Get material indices start
-        mat_vtx_idx = 0	
+        #Get material indices for vertices
+        num_mat_idx = 0
+        num_vtx = 0
+        material_vtx = []
         for mat_line in lines:
             l = mat_line.strip()
             words = mat_line.split()
             if l and words[0] == "MeshMaterialList" :
-                mat_vtx_idx = lines.index(mat_line) + 3
-                #print(mat_vtx_idx)
-                
+                num_mat_idx = self.lines.index(mat_line) + 3
+                num_vtx = self.lines[num_mat_idx]
+                num_vtx = self.clean_line(num_vtx)
+                num_vtx = int(num_vtx)
+                print("mat_vtx_idx {}".format(num_vtx))
+        for i in range(num_vtx):
+            lin = self.lines[num_mat_idx + 1 + i]
+            lin_str = self.clean_line(lin)
+            mat_id_vtx = int(lin_str)
+            #lin_str = lin_str.strip()
+            material_vtx.append(mat_id_vtx)
+        print(len(material_vtx))   
+ 
         #Create The Mesh
         for line in lines:
             l = line.strip()
@@ -65,19 +69,14 @@ class xImport:
             if l and words[0] == "Mesh" :											
                 mesh_line_idx = lines.index(line)
                 print("mesh line idx {}".format(mesh_line_idx))																		
-                self.write_vertices(mesh_line_idx, mesh, uv_line_idx, mat_vtx_idx, textures)
-        
-        #if len(mat_list) < 16:
-        #        mesh.setMaterials(mat_list)
-        #        mesh.update()
+                self.write_vertices(mesh_line_idx, mesh, uv_line_idx, material_vtx, materials)
                 
-    def write_vertices(self, mesh_line_idx, mesh, uv_line_idx, mat_vtx_idx, textures):
+    def write_vertices(self, mesh_line_idx, mesh, uv_line_idx, material_vtx, materials):
         vertices = []
         faces = []
         edges = []
         normals = []
         uv = []
-        materials = {}
         print(mesh_line_idx)
         # find num vertices
         lin = self.lines[mesh_line_idx + 1]
@@ -109,9 +108,9 @@ class xImport:
             lin_str = self.clean_line(lin)
             num_face  = int((lin_str.split()[0]))
             face_idx = self.lines.index(lin)
-        print(num_face)
+        print("num faces is {}".format(num_face))
         fac_array = range(face_idx + 1, (face_idx + num_face + 1)) #face array
-        
+
         # set vertices array
         i = 0
         for l in vx_array: 
@@ -176,42 +175,48 @@ class xImport:
             offset = loop.vertex_index 
             per_loop_list.extend((uv[offset][0], uv[offset][1]))
         uv_layer.data.foreach_set('uv', per_loop_list)
-        #mesh_obj.normals_split_custom_set_from_vertices(vert_normals)
-        #mesh_obj.use_auto_smooth = True
-        # link the object with a scene
+
+        # set materials
+        for mat in materials:
+            mesh_obj.data.materials.append(mat)
+        for face in mesh_obj.data.polygons:
+            face_idx = face.index
+            mat_idx = material_vtx[face_idx]
+            face.material_index = mat_idx
+            
         bpy.context.collection.objects.link(mesh_obj)
 
     def write_materials(self, nr_mat, idx, materials, textures):
         '''
-        Create materials and set testures to a list
+        Create materials and set textures to a list
         '''
         name = "Material_" + str(idx)
-        #mat = Material.New(name)
         mat = bpy.data.materials.new(name)
         mat.use_nodes = True
         bsdf = mat.node_tree.nodes["Principled BSDF"]
         link = mat.node_tree.links.new
         lin = self.lines[nr_mat + 2]   #ve
-        #print line
         fixed_line = self.clean_line(lin)
         words = fixed_line.split()	
         mat.node_tree.nodes["Principled BSDF"].inputs["Base Color"].default_value = (float(words[0]),
                                                                                      float(words[1]),
                                                                                      float(words[2]),
                                                                                      float(words[3]))
-                                                                                     
+        
+        materials.append(mat)                                                                             
         lin = self.lines[nr_mat + 6]
         lin_str = self.clean_line(lin)
         tex_n = lin_str.split() # "TextureFilename" sting
         #for packfile explorer
         if not tex_n:		
-            lin = self.lines[nr_mat + 7]    #ve
+            lin = self.lines[nr_mat + 7]  
             lin_str = self.clean_line(lin)
             tex_n = lin_str.split()
             print("tex_n is {}".format(tex_n))
             if tex_n and tex_n[0] == "TextureFilename" :
                 #print("texture works")
                 if len(tex_n) > 1:
+                    print("tex_n is {}".format(tex_n))
                     textures.append(tex_n[1])
                 if len(tex_n) <= 1 :
                     #print("dir path {}".format(self.dir_path))
@@ -237,16 +242,38 @@ class xImport:
         #for vamped 92
         else:				
             if tex_n and tex_n[0] == "TextureFilename" :
-                print("yes texture?")
-                if len(tex_n) > 1:
+                if len(tex_n) > 1: # tex_n =['TextureFilename', 'tongue.tga']
+                    is_tex_exist = True
+                    tex_name_str = self.clean_line(tex_n[1])
+                    tex_path = os.path.join(self.dir_path, tex_name_str)
+                    tex_node = mat.node_tree.nodes.new('ShaderNodeTexImage')
+                    tex_node.location =(-300, 350)
+                    try:
+                        tex_node.image = bpy.data.images.load(tex_path)
+                    except:
+                        is_tex_exist = False
+                        print("Missing texture {}".format(tex_path))
+                    if is_tex_exist:
+                        link(tex_node.outputs['Color'], bsdf.inputs[0])
                     textures.append(tex_n[1])
-
                 if len(tex_n) <= 1 :
-
+                    print("vamped")
+                    is_tex_exist = True
                     lin_tex_name = self.lines[nr_mat + 7] #ve
                     tex_name_str = self.clean_line(lin_tex_name)
                     tex_name_str = tex_name_str.split()
                     textures.append(tex_name_str[0])
+                    tex_path = os.path.join(self.dir_path, tex_name_str[0])
+                    tex_node = mat.node_tree.nodes.new('ShaderNodeTexImage')
+                    tex_node.location =(-300, 350)
+                    try:
+                        tex_node.image = bpy.data.images.load(tex_path)
+                    except:
+                        is_tex_exist = False
+                        print("Missing texture {}".format(tex_path))
+                    if is_tex_exist:
+                        link(tex_node.outputs['Color'], bsdf.inputs[0])
+                        print("texture applied")
             else :
                 tex_name_str = None
                 textures.append(tex_name_str)
@@ -260,3 +287,5 @@ class xImport:
         fix_4_line = fix_3_line.replace(",", " ")
         fix_5_line = fix_4_line.replace("'", " ")
         return fix_5_line
+    
+        
