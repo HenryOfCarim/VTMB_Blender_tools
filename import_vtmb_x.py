@@ -162,7 +162,7 @@ class xImport:
                 v_uv = v_uv.split()
                 #print(v_uv)
                 x = float(v_uv[0])
-                y = ((float(v_uv[1]))* -1) + 1
+                y = (1 - float(v_uv[1])) #flip UV
                 uv_tuple = (x, y)
                 uv.append(uv_tuple)
                 

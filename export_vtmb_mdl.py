@@ -62,7 +62,7 @@ class xExport:
 
 		self.file.seek(324)
 		temp_data = self.file.read(4)           #offset for smd
-		data=struct.unpack('<i', temp_data)
+		data = struct.unpack('<i', temp_data)
 		print ("model offset is {}: ".format(data[0]))
 		off_vert = data[0]+16
 		self.file.seek(off_vert+144)             #offset for number and position of the vertices in model
@@ -76,18 +76,29 @@ class xExport:
 		#print "filename1: ", filename1
 
 		#  check number of vertices against the mdl if no match exit
-		#if num_vtx_og != num_vtx_exported :
-		if True:
+		if num_vtx_og != num_vtx_exported :
 			print("Wrong count of vertice exiting...")
 			#result=Blender.Draw.PupMenu("Model vertices dont match Blender vertices %t|OK")
 		else:
 		#	write list for vertice UV
-			if mesh.hasFaceUV():
-
-				for face in mesh.faces:
-					texcoord[face.v[0].index] = (face.uv[0][0], 1 -face.uv[0][1])
-					texcoord[face.v[1].index] = (face.uv[1][0], 1 -face.uv[1][1])
-					texcoord[face.v[2].index] = (face.uv[2][0], 1 -face.uv[2][1])
+			try:
+				uv_layer = mesh.uv_layers[0]
+			except IndexError:
+				print("no UV")
+			uv_cordinate = {}
+			uvs_per_loop = uv_layer.data
+			for i, loop in enumerate(mesh.loops):
+				vertex_index = loop.vertex_index
+				if vertex_index in uv_cordinate:
+					continue
+				else:
+					uvs = uvs_per_loop[i].uv
+					uv_cordinate[vertex_index] = (uvs[0], (1 - uvs[1]))
+			#if mesh.hasFaceUV():
+			#for face in mesh.polygons:
+				#texcoord[face.vertices[0].index] = (face.uv[0][0], 1 -face.uv[0][1])
+				#texcoord[face.vertices[1].index] = (face.uv[1][0], 1 -face.uv[1][1])
+				#texcoord[face.vertices[2].index] = (face.uv[2][0], 1 -face.uv[2][1])
 
 		#	start writing new mdl file
 
@@ -95,31 +106,32 @@ class xExport:
 			self.export_file.write(self.file.read(vtx_ofs))  #read and write until first vertex position
 
 			ii = 0
-			for vert in mesh.verts:
+			for vert in mesh.vertices:
 
 				temp_data = self.file.read(44)	     #get vertices information, normals, UVs
 				data = struct.unpack('<3BB4h3f3f2f',temp_data)
 
-				if texcoord[ii][0] != 0.0:
-					if not ((vert.co.x == 0.0) and (vert.co.y == 0.0) and (vert.co.z == 0.0)):
+				#if texcoord[ii][0] != 0.0:
+				if uv_cordinate[ii][0] != 0.0:
+					if not ((vert.co[0] == 0.0) and (vert.co[1] == 0.0) and (vert.co[2] == 0.0)):
 						temp_data = struct.pack('<3BB4h3f',data[0],data[1],data[2],data[3],data[4],data[5],data[6],data[7],data[8],data[9],data[10]) #no vertices
 						if export_vert: temp_data = struct.pack('<3BB4h3f',data[0],data[1],data[2],data[3],data[4],data[5],data[6],data[7],vert.co.x,vert.co.y,vert.co.z) #with vertices
-						temp_data1 = struct.pack('<3f',data[11],data[12],data[13]) #no normals
-						if export_normal: temp_data1 = struct.pack('<3f',vert.no.x,vert.no.y,vert.no.z) # with normals
-						temp_data2 = struct.pack('<2f',data[14],data[15]) #no UV
-						if export_uv: temp_data2 = struct.pack('<2f',texcoord[ii][0],texcoord[ii][1]) #with uv
+						nrm_data = struct.pack('<3f',data[11],data[12],data[13]) #no normals
+						if export_normal: nrm_data = struct.pack('<3f',vert.normal[0],vert.normal[1],vert.normal[2]) # with normals
+						uv_data = struct.pack('<2f',data[14],data[15]) #no UV
+						if export_uv: uv_data = struct.pack('<2f',uv_cordinate[ii][0],uv_cordinate[ii][1]) #with uv
 						#temp_data = struct.pack('<3BB4h3f3f2f',data[0],data[1],data[2],data[3],data[4],data[5],data[6],data[7],data[8],data[9],data[10],data[11],data[12],data[13],texcoord[ii][0],texcoord[ii][1]) #only uv
 						#                                        w1      w2      w3      n+?     b1     b2      b3        0       x      y        z       nx       ny       nz             u            v           #
 				else:
-					if not ((vert.co.x == 0.0) and (vert.co.y == 0.0) and (vert.co.z == 0.0)):
+					if not ((vert.co[0] == 0.0) and (vert.co[1] == 0.0) and (vert.co[2] == 0.0)):
 						temp_data = struct.pack('<3BB4h3f',data[0],data[1],data[2],data[3],data[4],data[5],data[6],data[7],data[8],data[9],data[10]) #no vertices
-						if export_vert: temp_data = struct.pack('<3BB4h3f',data[0],data[1],data[2],data[3],data[4],data[5],data[6],data[7],vert.co.x,vert.co.y,vert.co.z) #with vertices
-						temp_data1 = struct.pack('<3f',data[11],data[12],data[13]) #no normals
-						if export_normal: temp_data1 = struct.pack('<3f',vert.no.x,vert.no.y,vert.no.z) # with normals
-						temp_data2 = struct.pack('<2f',data[14],data[15]) #no UV
+						if export_vert: temp_data = struct.pack('<3BB4h3f',data[0],data[1],data[2],data[3],data[4],data[5],data[6],data[7],vert.co[0],vert.co[1],vert.co[2]) #with vertices
+						nrm_data = struct.pack('<3f',data[11],data[12],data[13]) #no normals
+						if export_normal: nrm_data = struct.pack('<3f',vert.normal[0],vert.normal[1],vert.normal[2]) # with normals
+						uv_data = struct.pack('<2f',data[14],data[15]) #no UV
 				self.export_file.write(temp_data) #overwite verts with blender value
-				self.export_file.write(temp_data1) #overwite normals with blender value
-				self.export_file.write(temp_data2) #overwite UV with blender value
+				self.export_file.write(nrm_data) #overwite normals with blender value
+				self.export_file.write(uv_data) #overwite UV with blender value
 				ii += 1
 
 			self.export_file.write(self.file.read()) #finishing writing the mdl
